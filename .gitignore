@@ -1,0 +1,5 @@
+.DS_Store
+
+# Internal hiring artifacts — never ship to candidates
+**/rubric.md
+**/_internal/
