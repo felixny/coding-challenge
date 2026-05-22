@@ -128,7 +128,7 @@ The files contain intentional, realistic problems:
 **Out of scope:**
 - Auth, authorization, multi-tenancy boundaries. You'll model multiple grocers as **data** — you don't need any tenancy isolation, RBAC, or per-user views.
 
-### Suggested tables in your schema (your jon is to decide the final shape of the columns). If you think additional tables are useful then by all means create them.
+### Suggested tables in your schema (your job is to decide the final shape of the columns). If you think additional tables are useful then by all means create them.
 
 - `grocers`
 - `stores`
