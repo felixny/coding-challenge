@@ -1,0 +1,30 @@
+{
+  "name": "grocery-app",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "BODY_SIZE_LIMIT=10485760 vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "import:ja": "tsx scripts/import-ja.ts",
+    "import:all": "tsx scripts/import-all.ts",
+    "smoke": "tsx scripts/smoke-test.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.21",
+    "@sveltejs/adapter-auto": "^6.0.1",
+    "@sveltejs/kit": "^2.21.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "svelte": "^5.28.2",
+    "svelte-check": "^4.1.7",
+    "typescript": "^5.8.3",
+    "tsx": "^4.19.4",
+    "vite": "^6.3.5"
+  }
+}
