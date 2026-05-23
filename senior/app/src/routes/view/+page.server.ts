@@ -4,6 +4,7 @@ import { getDataQualityDetails } from '$lib/server/db/quality';
 import {
   parseViewFilters,
   queryPrices,
+  queryPriceComparison,
   queryProducts,
   querySalesAggregates,
   querySalesByStore,
@@ -19,6 +20,8 @@ export const load: PageServerLoad = async ({ url }) => {
 
   const products = filters.tab === 'products' ? queryProducts(filters) : [];
   const prices = filters.tab === 'prices' ? queryPrices(filters) : [];
+  const priceComparison =
+    filters.tab === 'compare' ? queryPriceComparison(filters) : { storeCodes: [], rows: [] };
   const sales = filters.tab === 'sales' ? querySalesAggregates(filters) : [];
   const salesByStore = filters.tab === 'sales' ? querySalesByStore(filters) : [];
   const salesTrend = filters.tab === 'sales' ? querySalesTrend(filters) : [];
@@ -29,6 +32,7 @@ export const load: PageServerLoad = async ({ url }) => {
     filters,
     products,
     prices,
+    priceComparison,
     sales,
     salesByStore,
     salesTrend,

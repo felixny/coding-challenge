@@ -85,6 +85,16 @@ export interface DailySalesTrend {
   transaction_count: number;
 }
 
+export interface PriceComparisonRow {
+  upc_plu: string;
+  description: string | null;
+  prices_by_store: Record<string, number | null>;
+  min_price: number | null;
+  max_price: number | null;
+  spread: number | null;
+  stores_with_price: number;
+}
+
 export interface DataQualitySummary {
   orphaned_sales: number;
   products_without_price: number;

@@ -66,7 +66,7 @@ Restart the app and you get a fresh database with the three sample grocers seede
 
 `/import` upload and import CSVs, see counts and data quality warnings
 
-`/view` browse products, prices, and aggregated sales (select a grocer first)
+`/view` browse products, prices, cross-store price comparison, and aggregated sales (select a grocer first)
 
 ## Database
 

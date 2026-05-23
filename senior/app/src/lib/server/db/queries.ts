@@ -1,11 +1,24 @@
 import { getDb } from './index';
-import type { DailySalesTrend, SalesAggregate, StoreSalesSummary } from '$lib/types/entities';
+import type {
+  DailySalesTrend,
+  PriceComparisonRow,
+  SalesAggregate,
+  StoreSalesSummary
+} from '$lib/types/entities';
 
 export interface ViewFilters {
   grocerId: number | null;
   storeId: number | null;
-  tab: 'products' | 'prices' | 'sales';
+  tab: 'products' | 'prices' | 'compare' | 'sales';
   search: string;
+}
+
+interface RawStorePrice {
+  upc_plu: string;
+  store_code: string;
+  price: number | null;
+  price_type: string | null;
+  price_priority: number | null;
 }
 
 export interface ProductRow {
@@ -69,12 +82,27 @@ function salesSearchClause(): string {
     LOWER(st.store_code) LIKE LOWER(@searchLike) ESCAPE '\\')`;
 }
 
+function pickDisplayPrice(rows: RawStorePrice[]): number | null {
+  const priced = rows.filter((row) => row.price != null);
+  if (priced.length === 0) return null;
+
+  const regular = priced.filter((row) => row.price_type === 'REG');
+  const pool = regular.length > 0 ? regular : priced;
+
+  return pool.sort((a, b) => (b.price_priority ?? 0) - (a.price_priority ?? 0))[0].price;
+}
+
 export function parseViewFilters(searchParams: URLSearchParams): ViewFilters {
   const grocerId = parsePositiveInt(searchParams.get('grocer'));
   let storeId = parsePositiveInt(searchParams.get('store'));
   const tabParam = searchParams.get('tab');
   const tab =
-    tabParam === 'prices' || tabParam === 'sales' || tabParam === 'products' ? tabParam : 'products';
+    tabParam === 'prices' ||
+    tabParam === 'compare' ||
+    tabParam === 'sales' ||
+    tabParam === 'products'
+      ? tabParam
+      : 'products';
   const search = normalizeSearch(searchParams.get('q'));
 
   if (grocerId && storeId) {
@@ -187,6 +215,105 @@ export function querySalesByStore(filters: ViewFilters): StoreSalesSummary[] {
       grocerId: filters.grocerId,
       storeId: filters.storeId
     }) as StoreSalesSummary[];
+}
+
+export function queryPriceComparison(filters: ViewFilters): {
+  storeCodes: string[];
+  rows: PriceComparisonRow[];
+} {
+  if (filters.grocerId == null) return { storeCodes: [], rows: [] };
+
+  const storeCodes = (
+    getDb()
+      .prepare('SELECT store_code FROM stores WHERE grocer_id = ? ORDER BY store_code')
+      .all(filters.grocerId) as Array<{ store_code: string }>
+  ).map((row) => row.store_code);
+
+  if (storeCodes.length === 0) return { storeCodes: [], rows: [] };
+
+  const rawPrices = getDb()
+    .prepare(
+      `SELECT
+         pr.upc_plu,
+         st.store_code,
+         pr.price,
+         pr.price_type,
+         pr.price_priority
+       FROM prices pr
+       JOIN stores st ON st.id = pr.store_id
+       WHERE st.grocer_id = @grocerId`
+    )
+    .all({ grocerId: filters.grocerId }) as RawStorePrice[];
+
+  const descriptions = new Map(
+    (
+      getDb()
+        .prepare('SELECT upc_plu, description FROM products WHERE grocer_id = ?')
+        .all(filters.grocerId) as Array<{ upc_plu: string; description: string | null }>
+    ).map((row) => [row.upc_plu, row.description])
+  );
+
+  const pricesByUpcStore = new Map<string, Map<string, RawStorePrice[]>>();
+
+  for (const row of rawPrices) {
+    let byStore = pricesByUpcStore.get(row.upc_plu);
+    if (!byStore) {
+      byStore = new Map();
+      pricesByUpcStore.set(row.upc_plu, byStore);
+    }
+
+    const existing = byStore.get(row.store_code) ?? [];
+    existing.push(row);
+    byStore.set(row.store_code, existing);
+  }
+
+  const search = filters.search.trim().toLowerCase();
+  const rows: PriceComparisonRow[] = [];
+
+  for (const [upc_plu, byStore] of pricesByUpcStore) {
+    const description = descriptions.get(upc_plu) ?? null;
+
+    if (search) {
+      const haystack = `${upc_plu} ${description ?? ''}`.toLowerCase();
+      if (!haystack.includes(search)) continue;
+    }
+
+    const prices_by_store: Record<string, number | null> = {};
+    const numericPrices: number[] = [];
+
+    for (const store_code of storeCodes) {
+      const price = pickDisplayPrice(byStore.get(store_code) ?? []);
+      prices_by_store[store_code] = price;
+      if (price != null) numericPrices.push(price);
+    }
+
+    if (numericPrices.length < 2) continue;
+
+    const min_price = Math.min(...numericPrices);
+    const max_price = Math.max(...numericPrices);
+    const spread =
+      max_price > min_price ? Number((max_price - min_price).toFixed(2)) : null;
+
+    rows.push({
+      upc_plu,
+      description,
+      prices_by_store,
+      min_price,
+      max_price,
+      spread,
+      stores_with_price: numericPrices.length
+    });
+  }
+
+  rows.sort((a, b) => {
+    const spreadDiff = (b.spread ?? 0) - (a.spread ?? 0);
+    if (spreadDiff !== 0) return spreadDiff;
+    return (a.description ?? a.upc_plu).localeCompare(b.description ?? b.upc_plu, undefined, {
+      sensitivity: 'base'
+    });
+  });
+
+  return { storeCodes, rows };
 }
 
 export function querySalesTrend(filters: ViewFilters): DailySalesTrend[] {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import DataQualityPanel from '$lib/components/DataQualityPanel.svelte';
+  import PriceComparePanel from '$lib/components/PriceComparePanel.svelte';
   import SalesCharts from '$lib/components/SalesCharts.svelte';
   import type { ViewFilters } from '$lib/server/db/queries';
 
@@ -46,7 +47,7 @@
     <div>
       <p class="page-kicker">Explore data</p>
       <h1 class="page-title">View</h1>
-      <p class="page-desc">Browse products, prices, and aggregated sales by grocer and store.</p>
+      <p class="page-desc">Browse products, prices, cross-store comparisons, and aggregated sales.</p>
     </div>
     <div class="page-hero-art" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -151,6 +152,13 @@
           Prices
         </a>
         <a
+          href={tabHref('compare')}
+          class:active={data.filters.tab === 'compare'}
+          class:tab-compare={true}
+        >
+          Compare
+        </a>
+        <a
           href={tabHref('sales')}
           class:active={data.filters.tab === 'sales'}
           class:tab-sales={true}
@@ -169,7 +177,7 @@
             <path d="M5 7l1 14h12l1-14" />
           </svg>
         </div>
-        <p>Select a grocer to view products, prices, and sales.</p>
+        <p>Select a grocer to view products, prices, comparisons, and sales.</p>
       </div>
     {:else if data.filters.tab === 'products'}
       <section class="table-section">
@@ -255,7 +263,32 @@
           </div>
         {/if}
       </section>
-    {:else}
+    {:else if data.filters.tab === 'compare'}
+      <section class="table-section">
+        <div class="section-head">
+          <h2>Price comparison across stores</h2>
+          <span class="count-badge">{data.priceComparison.rows.length} products</span>
+        </div>
+        <p class="compare-note">
+          Same UPC priced at two or more stores for this grocer. Uses REG price when available,
+          otherwise the highest-priority price. Store filter is ignored here.
+        </p>
+        {#if data.priceComparison.rows.length === 0}
+          <p class="empty-table">
+            {data.filters.search
+              ? `No cross-store prices matching "${data.filters.search}".`
+              : data.stores.length < 2
+                ? 'This grocer only has one store — nothing to compare.'
+                : 'No products with prices at multiple stores.'}
+          </p>
+        {:else}
+          <PriceComparePanel
+            storeCodes={data.priceComparison.storeCodes}
+            rows={data.priceComparison.rows}
+          />
+        {/if}
+      </section>
+    {:else if data.filters.tab === 'sales'}
       <section class="table-section">
         <div class="section-head">
           <h2>Sales (aggregated by UPC)</h2>
@@ -435,6 +468,12 @@
     color: var(--tone-prices);
   }
 
+  .tabs a.active.tab-compare {
+    background: var(--tone-stores-soft);
+    border-color: #ddd6fe;
+    color: var(--tone-stores);
+  }
+
   .tabs a.active.tab-sales {
     background: var(--tone-sales-soft);
     border-color: var(--accent-muted);
@@ -553,6 +592,12 @@
     background: var(--surface-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+  }
+
+  .compare-note {
+    margin: 0 0 0.85rem;
+    font-size: 0.88rem;
+    color: var(--muted);
   }
 
   .btn {

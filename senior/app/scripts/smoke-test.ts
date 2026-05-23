@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { importAllSampleFiles, importUploadedFiles, summarizeBatch } from '../src/lib/server/etl/batch.ts';
 import { getDb, tableCounts } from '../src/lib/server/db/index.ts';
 import { getDataQualitySummary } from '../src/lib/server/db/quality.ts';
+import { queryPriceComparison } from '../src/lib/server/db/queries.ts';
 import { detectFileKind, extractStoreFromFilename } from '../src/lib/server/etl/detect.ts';
 import { normalizeDescriptionCase, parseOptionalNumber, parseSaleTimeMs } from '../src/lib/server/etl/normalize.ts';
 
@@ -73,6 +74,22 @@ section('sample import (all vendors)', () => {
   const quality = getDataQualitySummary();
   assert(quality.orphaned_sales > 0, 'expected orphaned sales in sample data');
   assert(quality.products_without_price > 0, 'expected products without price in sample data');
+
+  const colins = getDb()
+    .prepare('SELECT id FROM grocers WHERE slug = ?')
+    .get('colins-market') as { id: number };
+  const comparison = queryPriceComparison({
+    grocerId: colins.id,
+    storeId: null,
+    tab: 'compare',
+    search: ''
+  });
+  assert(comparison.storeCodes.length >= 2, 'colins has multiple stores');
+  assert(comparison.rows.length > 0, 'expected cross-store price comparisons for colins');
+  assert(
+    comparison.rows.some((row) => row.spread != null && row.spread > 0),
+    'expected at least one price spread across stores'
+  );
 
   importAllSampleFiles();
   const countsAfterReimport = tableCounts();
